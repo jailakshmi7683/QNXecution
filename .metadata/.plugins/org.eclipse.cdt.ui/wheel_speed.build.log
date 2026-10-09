@@ -1,0 +1,7 @@
+12:18:42 **** Build of configuration aarch64le-debug for project wheel_speed ****
+make -j8 all 
+qcc -Vgcc_ntoaarch64le -c -Wp,-MMD,build/aarch64le-debug/src/wheel_speed.d,-MT,build/aarch64le-debug/src/wheel_speed.o -o build/aarch64le-debug/src/wheel_speed.o  -Wall -fmessage-length=0 -g -O0 -fno-builtin  src/wheel_speed.c
+qcc -Vgcc_ntoaarch64le -o build/aarch64le-debug/wheel_speed   build/aarch64le-debug/src/wheel_speed.o  
+
+12:18:45 Build Finished. 0 errors, 0 warnings. (took 2s.292ms)
+
