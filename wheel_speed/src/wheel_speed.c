@@ -48,17 +48,6 @@ int main(void) {
         fclose(pidf);
     }
 
-//    /* ===== TEMPORARY TEST: simulate a stuck/hung service ===== */
-//    /* Comment out this #define to disable the test and restore normal operation */
-//    #define TEST_SIMULATE_STUCK
-//
-//    #ifdef TEST_SIMULATE_STUCK
-//    LOG_EVENT(SERVICE_NAME, "TEST", "simulating stuck state - entering long sleep");
-//    sleep(60); /* process stays alive (PID valid, responds to kill(pid,0))
-//                  but does zero work and never touches progress_counter */
-//    #endif
-//    /* ===== END TEMPORARY TEST ===== */
-
     LOG_EVENT(SERVICE_NAME, "STARTED", "waiting for requests");
 
     for (;;) {
