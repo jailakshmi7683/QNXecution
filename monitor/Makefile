@@ -1,4 +1,4 @@
-ARTIFACT = wheel_speed
+ARTIFACT = monitor
 
 #Build architecture/variant string, possible values: x86, armv7le, etc...
 PLATFORM ?= aarch64le
@@ -21,7 +21,6 @@ LD = $(CC)
 #INCLUDES += -I/path/to/my/lib/include
 #INCLUDES += -I../mylib/public
 
-LIBS += -lm
 #LIBS += -L/path/to/my/lib/$(PLATFORM)/usr/lib -lmylib
 #LIBS += -L../mylib/$(OUTPUT_DIR) -lmylib
 
