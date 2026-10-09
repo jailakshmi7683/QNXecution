@@ -1,0 +1,24 @@
+# Eclipse / QNX Momentics workspace
+.metadata/
+**/.settings/
+**/.project
+**/.cproject
+**/.trgtproject
+
+# Build/generated files
+**/build/
+**/output/
+
+# Logs and locks
+*.log
+*.lock
+
+# Compiled files
+*.o
+*.elf
+*.map
+*.d
+
+# QNX VM environment
+vmmp/
+10.0.0.1/
