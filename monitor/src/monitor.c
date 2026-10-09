@@ -24,6 +24,7 @@
 #include <sys/wait.h>
 #ifdef __QNXNTO__
 #include <sched.h>
+
 #endif
 #include "common.h"
 #include "fault.h"
@@ -840,6 +841,7 @@ int main(void) {
     if (d && *d) g_bin_dir = d;
     g_t0_ms = now_ms();
     srand((unsigned)g_t0_ms);
+    signal(SIGPIPE, SIG_IGN);   /* GUI link may drop; do not die on a closed stdout */
 
     size_t len = strlen(g_bin_dir);
     const char *sep = (len && g_bin_dir[len - 1] == '/') ? "" : "/";
