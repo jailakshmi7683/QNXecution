@@ -248,15 +248,8 @@ Notes on the numbers:
 - Hang detection takes about 5 s with the current service loop periods.
 - The Pi has no real-time clock, so wall-clock timestamps in raw console lines can be wrong; `events.csv` and all metrics use the monotonic clock.
 - Tested on Raspberry Pi 4 only.
-
-## 13. AI assistance disclosure
-
-> **Edit this section so it is accurate for your team, and follow the hackathon's AI-use rules.**
-
-AI assistance (Claude, Anthropic) was used during development for: [list exactly what — for example the monitor's recovery state machine, `fault.h`, the CLI and scenario runner, the heartbeat change in `wheel_speed`, this README]. The team wrote and is responsible for: [list — for example the original service design, the dependency graph and root-cause idea, testing and deployment on the Pi, the GUI]. Every part of the code was reviewed, built and tested on the target by the team.
-
 ---
 
-## 15. Team
+## 14. Team
 
 Team 15 : QNXecution — CBIT
