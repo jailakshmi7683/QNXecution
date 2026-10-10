@@ -58,6 +58,8 @@ class EcuLink:
         self.services = {n: _blank() for n in SERVICES}
         self.stats = {"injections": 0, "recoveries": 0, "met": 0, "missed": 0, "degraded": 0}
         self.recovery_ms = []
+        self.detection_ms = []
+        self._inject_rx = []
 
     # ---------------- connection ----------------
     def connect(self, password, trust_new_host=False):
@@ -258,6 +260,14 @@ class EcuLink:
                     self.recovery_ms.append(int(m.group(2)))
             elif ev == "INJECT":
                 self.stats["injections"] += 1
+                self._inject_rx.append(time.monotonic())
+            elif ev == "FAULT_DETECTED":
+                detected_at = time.monotonic()
+                # Approximate transport-observed latency from the most recent injection.
+                # This is explicitly a GUI-side observed interval, not a hard real-time guarantee.
+                if self._inject_rx:
+                    started = self._inject_rx.pop(0)
+                    self.detection_ms.append(max(0, int((detected_at - started) * 1000)))
             self._clear_stale_affected()
         self.events.put(("event", {"ts": ts, "event": ev, "text": text}))
 
@@ -272,4 +282,5 @@ class EcuLink:
         with self._lock:
             return {"services": {k: dict(v) for k, v in self.services.items()},
                     "stats": dict(self.stats), "recovery_ms": list(self.recovery_ms),
-                    "live": self.running and (time.monotonic() - self._last_rx) < 4.0}
+                    "live": self.running and (time.monotonic() - self._last_rx) < 4.0,
+                    "detection_ms": list(self.detection_ms)}

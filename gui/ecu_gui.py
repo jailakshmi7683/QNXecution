@@ -5,6 +5,8 @@ import queue
 import re
 import threading
 import time
+import json
+import os
 import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox, simpledialog, ttk
@@ -60,12 +62,17 @@ class App:
         self.link = None
         self.busy = False
         self.t0 = None
+        self.theme_choice = tk.StringVar(value=self._load_theme())
+        self._last_graph_signature = None
+        self._resize_job = None
         root.title("ECU GUARDIAN - Automotive ECU Watchdog & Recovery")
         root.configure(bg=BG)
         root.geometry("1380x840")
-        root.minsize(1100, 700)
+        root.minsize(760, 620)
         self._style()
         self._build()
+        root.bind("<Configure>", self._on_resize)
+        self.apply_theme(self.theme_choice.get())
         root.protocol("WM_DELETE_WINDOW", self.on_close)
         root.after(250, self.tick)
 
@@ -120,9 +127,15 @@ class App:
         self.btn_connect.pack(side="left", padx=4)
         self.btn_stop = self._btn(bf, "Stop monitor", self.on_stop, RED)
         self.btn_stop.pack(side="left", padx=4)
+        tk.Label(bf, text="Theme", bg=BG, fg=DIM, font=("Segoe UI", 9)).pack(side="left", padx=(10, 3))
+        self.theme_box = ttk.Combobox(bf, textvariable=self.theme_choice,
+                                      values=("Dark", "Light", "System"), state="readonly", width=8)
+        self.theme_box.pack(side="left", padx=3)
+        self.theme_box.bind("<<ComboboxSelected>>", lambda _e: self.apply_theme(self.theme_choice.get()))
 
         # ---- Panel B: service cards
         pb = self._panel(r, "ECU SERVICES")
+        self.panel_services = pb
         pb.grid(row=1, column=0, sticky="nsew", padx=(12, 6), pady=6)
         self.cards = {}
         for n in SERVICES:
@@ -145,12 +158,16 @@ class App:
 
         # ---- Panel C: dependency graph
         pc = self._panel(r, "ECU DEPENDENCY GRAPH  (arrow = supplies data to)")
+        self.panel_graph = pc
         pc.grid(row=1, column=1, sticky="nsew", padx=6, pady=6)
         self.cv = tk.Canvas(pc, bg=PANEL, highlightthickness=0, height=320)
         self.cv.pack(fill="both", expand=True, padx=6, pady=6)
+        self.cv.bind("<Button-1>", self._graph_click)
+        self.graph_positions = {}
 
         # ---- Panels F + G: injection and LEDs
         right = tk.Frame(r, bg=BG)
+        self.panel_right = right
         right.grid(row=1, column=2, sticky="nsew", padx=(6, 12), pady=6)
         right.grid_rowconfigure(0, weight=3)
         right.grid_rowconfigure(1, weight=2)
@@ -210,6 +227,7 @@ class App:
 
         # ---- Panel D: timeline
         pd = self._panel(r, "FAILURE & RECOVERY TIMELINE  (events from the monitor)")
+        self.panel_timeline = pd
         pd.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=(12, 6), pady=6)
         tf = tk.Frame(pd, bg=PANEL)
         tf.pack(fill="both", expand=True, padx=6, pady=(0, 6))
@@ -226,14 +244,15 @@ class App:
 
         # ---- Panel E: metrics
         pe = self._panel(r, "RECOVERY METRICS  (from monitor events)")
+        self.panel_metrics = pe
         pe.grid(row=2, column=2, sticky="nsew", padx=(6, 12), pady=6)
         self.metric = {}
         mg = tk.Frame(pe, bg=PANEL)
         mg.pack(fill="x", padx=10)
         mg.grid_columnconfigure(1, weight=1)
         for i, k in enumerate(("Injections accepted", "Recoveries", "Within budget (MET)",
-                               "Budget missed", "Degraded incidents", "Recovery min / avg / max",
-                               "Restarts (all services)", "Unnecessary restarts")):
+                               "Budget missed", "Degraded incidents", "Recovery min / avg / max", "Detection latency min / avg / max",
+                               "Recovery success rate", "Restarts (all services)", "Unnecessary restarts")):
             tk.Label(mg, text=k, bg=PANEL, fg=DIM, font=("Segoe UI", 9)).grid(row=i, column=0, sticky="w")
             v = tk.Label(mg, text="-", bg=PANEL, fg=TEXT, font=("Consolas", 10, "bold"))
             v.grid(row=i, column=1, sticky="e")
@@ -243,10 +262,96 @@ class App:
 
         # ---- raw console (CLI fallback and honesty check)
         pr = self._panel(r, "MONITOR CONSOLE (raw output)")
+        self.panel_console = pr
         pr.grid(row=3, column=0, columnspan=3, sticky="nsew", padx=12, pady=(6, 12))
         self.txt = tk.Text(pr, height=6, bg=BG, fg=DIM, font=("Consolas", 9), relief="flat",
                            state="disabled", wrap="none")
         self.txt.pack(fill="both", expand=True, padx=6, pady=(0, 6))
+
+    # ------------------------------------------------------------ theme + responsive layout
+    def _load_theme(self):
+        try:
+            with open(os.path.join(os.path.expanduser("~"), ".ecu_guardian_theme.json"), "r", encoding="utf-8") as f:
+                return json.load(f).get("theme", "Dark")
+        except Exception:
+            return "Dark"
+
+    def apply_theme(self, choice):
+        # Tkinter has no portable OS-theme observer; System uses the Windows preference when available.
+        resolved = choice
+        if choice == "System":
+            try:
+                import winreg
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+                resolved = "Light" if winreg.QueryValueEx(key, "AppsUseLightTheme")[0] else "Dark"
+            except Exception:
+                resolved = "Dark"
+        dark = resolved != "Light"
+        palette = ({"BG":"#0b1220", "PANEL":"#121a2b", "CARD":"#16213a", "EDGE":"#1f2a44", "CYAN":"#22d3ee", "GREEN":"#34d399", "AMBER":"#fbbf24", "RED":"#f87171", "GREY":"#64748b", "TEXT":"#e2e8f0", "DIM":"#94a3b8"} if dark else
+                   {"BG":"#f3f6fb", "PANEL":"#ffffff", "CARD":"#edf2f9", "EDGE":"#cbd5e1", "CYAN":"#087e99", "GREEN":"#087f5b", "AMBER":"#9a6700", "RED":"#c62828", "GREY":"#64748b", "TEXT":"#172033", "DIM":"#526176"})
+        global BG, PANEL, CARD, EDGE, CYAN, GREEN, AMBER, RED, GREY, TEXT, DIM, TINT, EVENT_COLORS
+        old = {k: globals()[k] for k in palette}
+        for k, v in palette.items(): globals()[k] = v
+        TINT = {GREEN: ("#0f3d2e" if dark else "#d1fae5"), AMBER: ("#4a3a0c" if dark else "#fef3c7"), RED: ("#4a1a1a" if dark else "#fee2e2"), GREY: ("#1e293b" if dark else "#e2e8f0")}
+        EVENT_COLORS = {k: (CYAN if k in ("STARTED", "INJECT", "SCENARIO", "RESET") else RED if k in ("FAULT_DETECTED", "FAULT_UPDATE", "ROOT_CAUSE", "ESCALATE", "SAFE_STATE", "DEPENDENCY_LOST", "SPAWN_FAILED", "LINK_CLOSED") else AMBER if k in ("SYMPTOM", "RESTARTING", "KILL_RETRY", "WARNING", "SHUTDOWN") else GREEN if k in ("SYMPTOM_CLEARED", "READY", "RECOVERED", "STABLE", "PROGRESS_RESUMED") else TEXT) for k in EVENT_COLORS}
+        mapping = {old[k]: palette[k] for k in palette}
+        def recolor(widget):
+            try:
+                for opt in ("bg", "background", "fg", "foreground", "insertbackground", "highlightbackground", "selectcolor", "activebackground", "activeforeground"):
+                    try:
+                        val = widget.cget(opt)
+                        if val in mapping: widget.configure(**{opt: mapping[val]})
+                    except Exception: pass
+                if isinstance(widget, tk.Canvas): widget.configure(bg=PANEL)
+            except Exception: pass
+            for child in widget.winfo_children(): recolor(child)
+        recolor(self.root)
+        self.root.configure(bg=BG)
+        self._style()
+        for ev, col in EVENT_COLORS.items():
+            try: self.tree.tag_configure(ev, foreground=col)
+            except Exception: pass
+        try:
+            with open(os.path.join(os.path.expanduser("~"), ".ecu_guardian_theme.json"), "w", encoding="utf-8") as f:
+                json.dump({"theme": choice}, f)
+        except Exception: pass
+        self._last_graph_signature = None
+        if hasattr(self, "link"):
+            self.refresh(self.link.snapshot() if self.link else None)
+
+    def _on_resize(self, event):
+        if event.widget is not self.root: return
+        if self._resize_job:
+            try: self.root.after_cancel(self._resize_job)
+            except Exception: pass
+        self._resize_job = self.root.after(120, self._responsive_layout)
+
+    def _responsive_layout(self):
+        self._resize_job = None
+        width = self.root.winfo_width()
+        panels = (self.panel_services, self.panel_graph, self.panel_right, self.panel_timeline, self.panel_metrics, self.panel_console)
+        for panel in panels:
+            panel.grid_forget()
+        for c in range(3): self.root.grid_columnconfigure(c, weight=0, uniform="col")
+        if width >= 1180:
+            for c, weight in enumerate((3, 4, 3)): self.root.grid_columnconfigure(c, weight=weight, uniform="col")
+            self.panel_services.grid(row=1,column=0,sticky="nsew",padx=(12,6),pady=6)
+            self.panel_graph.grid(row=1,column=1,sticky="nsew",padx=6,pady=6)
+            self.panel_right.grid(row=1,column=2,sticky="nsew",padx=(6,12),pady=6)
+            self.panel_timeline.grid(row=2,column=0,columnspan=2,sticky="nsew",padx=(12,6),pady=6)
+            self.panel_metrics.grid(row=2,column=2,sticky="nsew",padx=(6,12),pady=6)
+            self.panel_console.grid(row=3,column=0,columnspan=3,sticky="nsew",padx=12,pady=(6,12))
+        else:
+            self.root.grid_columnconfigure(0, weight=1, uniform="col")
+            self.panel_services.grid(row=1,column=0,sticky="nsew",padx=10,pady=5)
+            self.panel_graph.grid(row=2,column=0,sticky="nsew",padx=10,pady=5)
+            self.panel_right.grid(row=3,column=0,sticky="nsew",padx=10,pady=5)
+            self.panel_metrics.grid(row=4,column=0,sticky="nsew",padx=10,pady=5)
+            self.panel_timeline.grid(row=5,column=0,sticky="nsew",padx=10,pady=5)
+            self.panel_console.grid(row=6,column=0,sticky="nsew",padx=10,pady=5)
+        self.root.grid_rowconfigure(1, weight=1)
+        for row in range(2,7): self.root.grid_rowconfigure(row, weight=1 if width < 1180 else (3 if row == 2 else 2 if row == 3 else 0))
+        self._last_graph_signature = None
 
     # ------------------------------------------------------------ connection
     def on_connect(self):
@@ -380,16 +485,25 @@ class App:
             self.t0 = dt
         return "T+%.3f s" % (dt - self.t0).total_seconds()
 
+
     def console_add(self, line):
-        if not line.strip() or NOISE.match(line):
+        if not line or not line.strip():
             return
+
+        timestamp = datetime.now().astimezone().strftime(
+            "%Y-%m-%d %H:%M:%S.%f"
+        )[:-3]
+
         self.txt.config(state="normal")
-        self.txt.insert("end", line + "\n")
+        self.txt.insert("end", f"[{timestamp}] {line.rstrip()}\n")
+
         n = int(self.txt.index("end-1c").split(".")[0])
         if n > 800:
             self.txt.delete("1.0", "%d.0" % (n - 800))
+
         self.txt.see("end")
         self.txt.config(state="disabled")
+
 
     def on_event(self, p):
         ev, text, ts = p["event"], p["text"], p["ts"]
@@ -464,14 +578,25 @@ class App:
         self.update_leds(svcs, live)
         self.update_metrics(snap, svcs)
 
+    def _graph_click(self, event):
+        for name, (x, y, radius) in getattr(self, "graph_positions", {}).items():
+            if (event.x-x)**2 + (event.y-y)**2 <= radius**2:
+                s = self.link.snapshot()["services"].get(name, {}) if self.link else {}
+                messagebox.showinfo(name, "State: %s\nPID: %s\nProgress age: %s ms\nRestarts: %s" % (s.get("state", "UNKNOWN"), s.get("pid", "-"), s.get("last_progress_ms", "-"), s.get("restarts", 0)), parent=self.root)
+                break
+
     def draw_graph(self, svcs, eff):
         cv = self.cv
+        signature = (cv.winfo_width(), cv.winfo_height(), tuple((n, svcs[n].get("state"), svcs[n].get("role"), svcs[n].get("tier")) for n in SERVICES), tuple((n, eff[n][0]) for n in SERVICES))
+        if signature == self._last_graph_signature: return
+        self._last_graph_signature = signature
         cv.delete("all")
         w, h = max(cv.winfo_width(), 320), max(cv.winfo_height(), 240)
         pos = {"wheel_speed": (0.14, 0.55), "abs": (0.50, 0.33),
                "traction_control": (0.50, 0.74), "dashboard": (0.86, 0.55)}
         P = {k: (v[0] * w, v[1] * h) for k, v in pos.items()}
-        R = 28
+        R = max(20, min(28, int(min(w, h) * 0.09)))
+        self.graph_positions = {n: (x, y, R) for n, (x, y) in P.items()}
         for consumer, suppliers in DEPENDS_ON.items():
             for sup in suppliers:
                 (x1, y1), (x2, y2) = P[sup], P[consumer]
@@ -508,7 +633,7 @@ class App:
         green = live and all(x == "HEALTHY" for x in states) and not affected
         for key, on in (("green", green), ("amber", amber), ("red", red)):
             c, item, col = self.leds[key]
-            c.itemconfig(item, fill=col if on else TINT[col])
+            c.itemconfig(item, fill=col if on else TINT.get(col,col))
 
     def update_metrics(self, snap, svcs):
         m = self.metric
@@ -517,6 +642,7 @@ class App:
                 v.config(text="-")
             return
         st, rec = snap["stats"], snap["recovery_ms"]
+        det = snap.get("detection_ms", [])
         m["Injections accepted"].config(text=str(st["injections"]))
         m["Recoveries"].config(text=str(st["recoveries"]))
         m["Within budget (MET)"].config(text=str(st["met"]))
@@ -524,6 +650,9 @@ class App:
         m["Degraded incidents"].config(text=str(st["degraded"]))
         m["Recovery min / avg / max"].config(
             text="%d / %d / %d ms" % (min(rec), sum(rec) / len(rec), max(rec)) if rec else "n/a")
+        m["Detection latency min / avg / max"].config(
+            text="%d / %d / %d ms" % (min(det), sum(det) / len(det), max(det)) if det else "n/a")
+        m["Recovery success rate"].config(text=("%.1f%% (%d/%d)" % (100.0 * st["met"] / st["recoveries"], st["met"], st["recoveries"])) if st["recoveries"] else "n/a")
         m["Restarts (all services)"].config(text=str(sum(s["restarts"] for s in svcs.values())))
         m["Unnecessary restarts"].config(text="n/a (see per-service restarts)")
 
