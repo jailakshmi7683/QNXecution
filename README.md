@@ -3,7 +3,6 @@
 A supervisory framework for **QNX OS 8.0 on Raspberry Pi 4** that monitors several simulated automotive ECU services, detects crashes, hangs, deadlock-style stalls and execution overruns, and **recovers only the failed service** (never the whole system). It ships with a mandatory CLI and an optional Python health dashboard.
 
 > Problem statement 7 — *Automotive ECU Watchdog & Recovery Framework*: detect software failures and recover individual ECU services without rebooting the entire system.
-
 ---
 
 ## 1. What it does
@@ -215,30 +214,8 @@ Notes on the numbers:
 - The GUI's detection latency includes the delay until the service's next loop activates the injected fault (up to about 3 s) and the stall window for hangs. The monitor's own `metrics` command reports activation-to-detection, which is the tighter figure.
 - Crashes are detected within about one tick (100 ms). Hangs take about 5 s because the stall limit must exceed the slowest service loop (3 s).
 
-> Replace this table with the output of `bench 20` from your final run.
-
 ---
-
-## 11. Problem statement coverage
-
-| Requirement | Status |
-|---|---|
-| Monitor multiple simulated ECU services | Done — 4 services with a dependency graph |
-| Missed heartbeats / timeouts | Done — shared-memory progress counters, 500 ms idle heartbeat |
-| Deadlocks | Partial — lock-hold hang is injected and detected as a stall |
-| Execution overruns | Done for the 4–5 s window (`OVERRUN` event); longer overruns are handled as hangs |
-| Restart failed services safely | Done — kill, reap, backoff, dependency-ordered respawn, verified progress |
-| Recovery without rebooting the system | Done — per-service, selective |
-| Message passing | Done — QNX native IPC |
-| Priority scheduling | Done — monitor 40, services 10 |
-| Failure timeline, recovery time, service health | Done — CLI, `events.csv`, GUI |
-| CLI (mandatory) and dashboard (optional) | Done |
-| GPIO LEDs | Simulated on screen only |
-| CAN / UART health messages | Not implemented (optional hardware) |
-
----
-
-## 12. Limitations (honest list)
+## 11. Limitations
 
 - The ECUs are **simulations**. This is a supervision framework, not a certified automotive safety system, and makes no ISO 26262 claim.
 - LEDs are shown on screen; the monitor does not drive GPIO. `enter_safe_state()` in `monitor.c` is the hook for it.
@@ -248,8 +225,7 @@ Notes on the numbers:
 - Hang detection takes about 5 s with the current service loop periods.
 - The Pi has no real-time clock, so wall-clock timestamps in raw console lines can be wrong; `events.csv` and all metrics use the monotonic clock.
 - Tested on Raspberry Pi 4 only.
----
 
-## 14. Team
+## 12. Team
 
 Team 15 : QNXecution — CBIT
