@@ -33,8 +33,8 @@
 /* Tunables                                                            */
 /* ------------------------------------------------------------------ */
 #define TICK_MS           100
-#define CORRELATION_MS    3500   /* STUCK waits this long for a culprit upstream to be flagged */
-#define ANCESTOR_QUIET_MS 1500   /* upstream silent this long may be about to be flagged too   */
+#define CORRELATION_MS    2000   /* STUCK waits this long for a culprit upstream to be flagged */
+#define ANCESTOR_QUIET_MS 1000   /* upstream silent this long may be about to be flagged too   */
 #define STABLE_MS         20000  /* continuous health before the retry budget resets            */
 #define KILL_WAIT_MS      1500
 #define SETTLE_MS         500    /* upstream must be up this long before dependents spawn       */

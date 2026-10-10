@@ -18,7 +18,7 @@
 #define ABS_NAME           "abs"
 #define TRACTION_NAME      "traction_control"
 #define WHEEL_SPEED_NAME   "wheel_speed"
-#define POLL_INTERVAL_US   2000000
+#define POLL_INTERVAL_US   500000
 
 static int poll_service(const char *service_name,
                         int *coid,

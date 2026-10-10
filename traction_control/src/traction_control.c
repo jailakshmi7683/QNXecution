@@ -19,7 +19,7 @@
 #define SERVICE_NAME "traction_control"
 #define UPSTREAM_NAME "wheel_speed"
 #define RECONNECT_DELAY_US 1000000
-#define WORKER_DELAY_US    3000000
+#define WORKER_DELAY_US    500000
 
 static pthread_mutex_t decision_lock = PTHREAD_MUTEX_INITIALIZER;
 static double latest_decision = 0.0;
